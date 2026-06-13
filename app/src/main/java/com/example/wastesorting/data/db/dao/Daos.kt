@@ -65,4 +65,18 @@ interface CaptureRecordDao {
     @Query("UPDATE capture_records SET itemName = :itemName, categoryName = :categoryName, " +
            "confidence = :confidence, isRecognized = 1 WHERE id = :id")
     suspend fun updateRecognition(id: Long, itemName: String, categoryName: String, confidence: Float)
+
+    @Query("DELETE FROM capture_records WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT categoryName, COUNT(*) as cnt FROM capture_records WHERE isRecognized = 1 GROUP BY categoryName")
+    suspend fun getCategoryStats(): List<CategoryStat>
+
+    @Query("SELECT categoryName, COUNT(*) as cnt FROM capture_records WHERE isRecognized = 1 AND timestamp >= :weekStart GROUP BY categoryName")
+    suspend fun getWeeklyStats(weekStart: Long): List<CategoryStat>
 }
+
+data class CategoryStat(
+    val categoryName: String,
+    val cnt: Int
+)

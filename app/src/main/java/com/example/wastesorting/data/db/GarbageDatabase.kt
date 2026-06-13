@@ -4,16 +4,12 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.wastesorting.data.db.dao.CaptureRecordDao
 import com.example.wastesorting.data.db.dao.GarbageCategoryDao
 import com.example.wastesorting.data.db.dao.GarbageItemDao
 import com.example.wastesorting.data.db.entity.CaptureRecordEntity
 import com.example.wastesorting.data.db.entity.GarbageCategory
 import com.example.wastesorting.data.db.entity.GarbageItem
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 @Database(
@@ -22,7 +18,7 @@ import org.json.JSONObject
         GarbageItem::class,
         CaptureRecordEntity::class
     ],
-    version = 3,
+    version = 6,
     exportSchema = false
 )
 abstract class GarbageDatabase : RoomDatabase() {
@@ -37,7 +33,13 @@ abstract class GarbageDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): GarbageDatabase {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
+                INSTANCE ?: buildDatabase(context).also { db ->
+                    INSTANCE = db
+                    // 首次创建或空库 → 同步预填充（此时 INSTANCE 已赋值，不会有竞态）
+                    if (db.garbageCategoryDao().getAll().isEmpty()) {
+                        prepopulate(db, context.applicationContext)
+                    }
+                }
             }
         }
 
@@ -47,23 +49,9 @@ abstract class GarbageDatabase : RoomDatabase() {
                 GarbageDatabase::class.java,
                 "waste_sorting.db"
             )
+            .allowMainThreadQueries()
             .fallbackToDestructiveMigration()
-            .addCallback(PrepopulateCallback(context))
             .build()
-        }
-    }
-
-    private class PrepopulateCallback(
-        private val context: Context
-    ) : RoomDatabase.Callback() {
-
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            INSTANCE?.let { database ->
-                CoroutineScope(Dispatchers.IO).launch {
-                    prepopulate(database, context)
-                }
-            }
         }
     }
 }
