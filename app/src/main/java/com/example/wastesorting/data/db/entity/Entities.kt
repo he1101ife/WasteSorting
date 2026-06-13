@@ -27,12 +27,13 @@ data class GarbageCategory(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("categoryId")]
+    indices = [Index("categoryId"), Index("classId")]
 )
 data class GarbageItem(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
-    val categoryId: Int
+    val categoryId: Int,
+    val classId: Int = -1   // TFLite 模型输出索引 0~39
 )
 
 /**

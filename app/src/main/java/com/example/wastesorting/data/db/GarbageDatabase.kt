@@ -22,7 +22,7 @@ import org.json.JSONObject
         GarbageItem::class,
         CaptureRecordEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class GarbageDatabase : RoomDatabase() {
@@ -47,6 +47,7 @@ abstract class GarbageDatabase : RoomDatabase() {
                 GarbageDatabase::class.java,
                 "waste_sorting.db"
             )
+            .fallbackToDestructiveMigration()
             .addCallback(PrepopulateCallback(context))
             .build()
         }
@@ -80,7 +81,7 @@ private fun prepopulate(database: GarbageDatabase, context: Context) {
     )
     categoryDao.insertAll(categories)
 
-    // 从 raw 资源读取垃圾分类字典
+    // 从 assets 读取 label_map.json（TFLite 索引顺序）
     val nameToCategoryId = mapOf(
         "可回收物" to 1,
         "厨余垃圾" to 2,
@@ -89,22 +90,17 @@ private fun prepopulate(database: GarbageDatabase, context: Context) {
     )
 
     try {
-        val jsonStr = context.resources.openRawResource(
-            context.resources.getIdentifier("garbage_dict", "raw", context.packageName)
-        ).bufferedReader().use { it.readText() }
-
+        val jsonStr = context.assets.open("label_map.json").bufferedReader().use { it.readText() }
         val json = JSONObject(jsonStr)
         val items = mutableListOf<GarbageItem>()
 
         for (key in json.keys()) {
-            val value = json.getString(key)  // 格式: "类别名/物品名"
-            val parts = value.split("/", limit = 2)
-            if (parts.size == 2) {
-                val categoryName = parts[0]
-                val itemName = parts[1]
-                val categoryId = nameToCategoryId[categoryName] ?: 4
-                items.add(GarbageItem(name = itemName, categoryId = categoryId))
-            }
+            val obj = json.getJSONObject(key)
+            val classId = obj.getInt("index")       // TFLite 输出索引 0~39
+            val category = obj.getString("category")
+            val label = obj.getString("label")
+            val categoryId = nameToCategoryId[category] ?: 4
+            items.add(GarbageItem(name = label, categoryId = categoryId, classId = classId))
         }
         itemDao.insertAll(items)
     } catch (e: Exception) {

@@ -31,6 +31,11 @@ interface GarbageItemDao {
            "WHERE gi.name = :name LIMIT 1")
     fun getByName(name: String): GarbageItemWithCategory?
 
+    @Query("SELECT gi.*, gc.name AS categoryName FROM garbage_items gi " +
+           "INNER JOIN garbage_categories gc ON gi.categoryId = gc.id " +
+           "WHERE gi.classId = :classId LIMIT 1")
+    fun getByClassId(classId: Int): GarbageItemWithCategory?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertAll(items: List<GarbageItem>)
 }
@@ -39,6 +44,7 @@ data class GarbageItemWithCategory(
     val id: Int,
     val name: String,
     val categoryId: Int,
+    val classId: Int,
     val categoryName: String
 )
 

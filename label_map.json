@@ -1,0 +1,282 @@
+{
+  "0": {
+    "index": 0,
+    "directory": "0",
+    "full_label": "其他垃圾/一次性快餐盒",
+    "category": "其他垃圾",
+    "label": "一次性快餐盒"
+  },
+  "1": {
+    "index": 1,
+    "directory": "1",
+    "full_label": "其他垃圾/污损塑料",
+    "category": "其他垃圾",
+    "label": "污损塑料"
+  },
+  "2": {
+    "index": 2,
+    "directory": "10",
+    "full_label": "厨余垃圾/茶叶渣",
+    "category": "厨余垃圾",
+    "label": "茶叶渣"
+  },
+  "3": {
+    "index": 3,
+    "directory": "11",
+    "full_label": "厨余垃圾/菜叶菜根",
+    "category": "厨余垃圾",
+    "label": "菜叶菜根"
+  },
+  "4": {
+    "index": 4,
+    "directory": "12",
+    "full_label": "厨余垃圾/蛋壳",
+    "category": "厨余垃圾",
+    "label": "蛋壳"
+  },
+  "5": {
+    "index": 5,
+    "directory": "13",
+    "full_label": "厨余垃圾/鱼骨",
+    "category": "厨余垃圾",
+    "label": "鱼骨"
+  },
+  "6": {
+    "index": 6,
+    "directory": "14",
+    "full_label": "可回收物/充电宝",
+    "category": "可回收物",
+    "label": "充电宝"
+  },
+  "7": {
+    "index": 7,
+    "directory": "15",
+    "full_label": "可回收物/包",
+    "category": "可回收物",
+    "label": "包"
+  },
+  "8": {
+    "index": 8,
+    "directory": "16",
+    "full_label": "可回收物/化妆品瓶",
+    "category": "可回收物",
+    "label": "化妆品瓶"
+  },
+  "9": {
+    "index": 9,
+    "directory": "17",
+    "full_label": "可回收物/塑料玩具",
+    "category": "可回收物",
+    "label": "塑料玩具"
+  },
+  "10": {
+    "index": 10,
+    "directory": "18",
+    "full_label": "可回收物/塑料碗盆",
+    "category": "可回收物",
+    "label": "塑料碗盆"
+  },
+  "11": {
+    "index": 11,
+    "directory": "19",
+    "full_label": "可回收物/塑料衣架",
+    "category": "可回收物",
+    "label": "塑料衣架"
+  },
+  "12": {
+    "index": 12,
+    "directory": "2",
+    "full_label": "其他垃圾/烟蒂",
+    "category": "其他垃圾",
+    "label": "烟蒂"
+  },
+  "13": {
+    "index": 13,
+    "directory": "20",
+    "full_label": "可回收物/快递纸袋",
+    "category": "可回收物",
+    "label": "快递纸袋"
+  },
+  "14": {
+    "index": 14,
+    "directory": "21",
+    "full_label": "可回收物/插头电线",
+    "category": "可回收物",
+    "label": "插头电线"
+  },
+  "15": {
+    "index": 15,
+    "directory": "22",
+    "full_label": "可回收物/旧衣服",
+    "category": "可回收物",
+    "label": "旧衣服"
+  },
+  "16": {
+    "index": 16,
+    "directory": "23",
+    "full_label": "可回收物/易拉罐",
+    "category": "可回收物",
+    "label": "易拉罐"
+  },
+  "17": {
+    "index": 17,
+    "directory": "24",
+    "full_label": "可回收物/枕头",
+    "category": "可回收物",
+    "label": "枕头"
+  },
+  "18": {
+    "index": 18,
+    "directory": "25",
+    "full_label": "可回收物/毛绒玩具",
+    "category": "可回收物",
+    "label": "毛绒玩具"
+  },
+  "19": {
+    "index": 19,
+    "directory": "26",
+    "full_label": "可回收物/洗发水瓶",
+    "category": "可回收物",
+    "label": "洗发水瓶"
+  },
+  "20": {
+    "index": 20,
+    "directory": "27",
+    "full_label": "可回收物/玻璃杯",
+    "category": "可回收物",
+    "label": "玻璃杯"
+  },
+  "21": {
+    "index": 21,
+    "directory": "28",
+    "full_label": "可回收物/皮鞋",
+    "category": "可回收物",
+    "label": "皮鞋"
+  },
+  "22": {
+    "index": 22,
+    "directory": "29",
+    "full_label": "可回收物/砧板",
+    "category": "可回收物",
+    "label": "砧板"
+  },
+  "23": {
+    "index": 23,
+    "directory": "3",
+    "full_label": "其他垃圾/牙签",
+    "category": "其他垃圾",
+    "label": "牙签"
+  },
+  "24": {
+    "index": 24,
+    "directory": "30",
+    "full_label": "可回收物/纸板箱",
+    "category": "可回收物",
+    "label": "纸板箱"
+  },
+  "25": {
+    "index": 25,
+    "directory": "31",
+    "full_label": "可回收物/调料瓶",
+    "category": "可回收物",
+    "label": "调料瓶"
+  },
+  "26": {
+    "index": 26,
+    "directory": "32",
+    "full_label": "可回收物/酒瓶",
+    "category": "可回收物",
+    "label": "酒瓶"
+  },
+  "27": {
+    "index": 27,
+    "directory": "33",
+    "full_label": "可回收物/金属食品罐",
+    "category": "可回收物",
+    "label": "金属食品罐"
+  },
+  "28": {
+    "index": 28,
+    "directory": "34",
+    "full_label": "可回收物/锅",
+    "category": "可回收物",
+    "label": "锅"
+  },
+  "29": {
+    "index": 29,
+    "directory": "35",
+    "full_label": "可回收物/食用油桶",
+    "category": "可回收物",
+    "label": "食用油桶"
+  },
+  "30": {
+    "index": 30,
+    "directory": "36",
+    "full_label": "可回收物/饮料瓶",
+    "category": "可回收物",
+    "label": "饮料瓶"
+  },
+  "31": {
+    "index": 31,
+    "directory": "37",
+    "full_label": "有害垃圾/干电池",
+    "category": "有害垃圾",
+    "label": "干电池"
+  },
+  "32": {
+    "index": 32,
+    "directory": "38",
+    "full_label": "有害垃圾/软膏",
+    "category": "有害垃圾",
+    "label": "软膏"
+  },
+  "33": {
+    "index": 33,
+    "directory": "39",
+    "full_label": "有害垃圾/过期药物",
+    "category": "有害垃圾",
+    "label": "过期药物"
+  },
+  "34": {
+    "index": 34,
+    "directory": "4",
+    "full_label": "其他垃圾/破碎花盆及碟碗",
+    "category": "其他垃圾",
+    "label": "破碎花盆及碟碗"
+  },
+  "35": {
+    "index": 35,
+    "directory": "5",
+    "full_label": "其他垃圾/竹筷",
+    "category": "其他垃圾",
+    "label": "竹筷"
+  },
+  "36": {
+    "index": 36,
+    "directory": "6",
+    "full_label": "厨余垃圾/剩饭剩菜",
+    "category": "厨余垃圾",
+    "label": "剩饭剩菜"
+  },
+  "37": {
+    "index": 37,
+    "directory": "7",
+    "full_label": "厨余垃圾/大骨头",
+    "category": "厨余垃圾",
+    "label": "大骨头"
+  },
+  "38": {
+    "index": 38,
+    "directory": "8",
+    "full_label": "厨余垃圾/水果果皮",
+    "category": "厨余垃圾",
+    "label": "水果果皮"
+  },
+  "39": {
+    "index": 39,
+    "directory": "9",
+    "full_label": "厨余垃圾/水果果肉",
+    "category": "厨余垃圾",
+    "label": "水果果肉"
+  }
+}

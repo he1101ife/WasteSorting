@@ -45,12 +45,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,14 +72,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.example.wastesorting.data.api.GarbageRecognitionClient
+import com.example.wastesorting.data.GarbageClassifier
 import com.example.wastesorting.data.db.GarbageDatabase
 import com.example.wastesorting.data.db.entity.CaptureRecordEntity
 import com.example.wastesorting.ui.theme.WasteSortingTheme
 import com.example.wastesorting.util.ImageUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -98,6 +93,7 @@ private const val TAG = "WasteSorting"
 sealed class Screen {
     object Main : Screen()
     object BrowseRecords : Screen()
+    data class Result(val bitmap: Bitmap, val recordId: Long) : Screen()
 }
 
 // ============================================================
@@ -119,12 +115,20 @@ class MainActivity : ComponentActivity() {
 fun AppRoot() {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
 
-    when (currentScreen) {
+    val navTo = { screen: Screen -> currentScreen = screen }
+
+    when (val screen = currentScreen) {
         is Screen.Main -> WasteSortingScreen(
-            onNavigateToRecords = { currentScreen = Screen.BrowseRecords }
+            onNavigateToRecords = { navTo(Screen.BrowseRecords) },
+            onNavigateToResult = { bitmap, recordId -> navTo(Screen.Result(bitmap, recordId)) }
         )
         is Screen.BrowseRecords -> BrowseRecordsScreen(
-            onBack = { currentScreen = Screen.Main }
+            onBack = { navTo(Screen.Main) }
+        )
+        is Screen.Result -> ResultScreen(
+            bitmap = screen.bitmap,
+            recordId = screen.recordId,
+            onExit = { navTo(Screen.Main) }
         )
     }
 }
@@ -133,7 +137,10 @@ fun AppRoot() {
 // 主界面
 // ============================================================
 @Composable
-fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
+fun WasteSortingScreen(
+    onNavigateToRecords: () -> Unit = {},
+    onNavigateToResult: (Bitmap, Long) -> Unit = { _, _ -> }
+) {
     val context = LocalContext.current
     val db = remember { GarbageDatabase.getInstance(context) }
     val scope = rememberCoroutineScope()
@@ -147,19 +154,6 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
     }
 
     val imageCaptureRef = remember { mutableStateOf<ImageCapture?>(null) }
-    var showSettingsMenu by remember { mutableStateOf(false) }
-
-    // 定格画面（拍照后一直定格，识别成功或点击画面后解锁）
-    var frozenBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    // 最近一次拍照的 Bitmap（识别用）
-    var lastCapturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    // 最近一次拍照的数据库记录 ID
-    var lastCaptureId by remember { mutableStateOf<Long?>(null) }
-
-    // 解锁定格画面
-    val unlockFreeze: () -> Unit = {
-        frozenBitmap = null
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -187,7 +181,7 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
         }
     }
 
-    // 拍照：定格画面，静默保存
+    // 拍照 → 保存 → 跳转结果页
     val takePhoto: () -> Unit = {
         if (!isCameraActive) {
             Toast.makeText(context, "请先开启摄像头", Toast.LENGTH_SHORT).show()
@@ -201,16 +195,18 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
                         ContextCompat.getMainExecutor(context),
                         object : OnImageCapturedCallback() {
                             override fun onCaptureSuccess(image: ImageProxy) {
-                                val bitmap = ImageUtils.imageProxyToBitmap(image)
+                                val rawBitmap = ImageUtils.imageProxyToBitmap(image)
+                                val rotation = image.imageInfo.rotationDegrees
                                 image.close()
+                                val bitmap = ImageUtils.rotateBitmap(rawBitmap, rotation)
 
-                                frozenBitmap = bitmap
-                                lastCapturedBitmap = bitmap
-
-                                // 后台保存到 MediaStore 并写入数据库
+                                // 后台保存并跳转
                                 scope.launch(Dispatchers.IO) {
-                                    saveAndRecord(context, db, bitmap) { recordId ->
-                                        lastCaptureId = recordId
+                                    val recordId = saveAndGetRecordId(context, db, bitmap)
+                                    withContext(Dispatchers.Main) {
+                                        isCameraActive = false
+                                        imageCaptureRef.value = null
+                                        onNavigateToResult(bitmap, recordId)
                                     }
                                 }
                             }
@@ -224,44 +220,6 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
                 } catch (e: Exception) {
                     Log.e(TAG, "拍照出错: ${e.message}", e)
                     Toast.makeText(context, "拍照出错", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    // 识别：调用 API → 写入数据库 → 提示结果
-    val recognize: () -> Unit = {
-        val id = lastCaptureId
-        val bitmap = lastCapturedBitmap
-        if (id == null || bitmap == null) {
-            Toast.makeText(context, "请先拍照", Toast.LENGTH_SHORT).show()
-        } else {
-            scope.launch {
-                Toast.makeText(context, "正在识别…", Toast.LENGTH_SHORT).show()
-                val jpegBytes = GarbageRecognitionClient.bitmapToJpegBytes(bitmap)
-                val result = GarbageRecognitionClient.recognize(jpegBytes)
-
-                withContext(Dispatchers.Main) {
-                    if (result.success && result.itemName != null && result.category != null) {
-                        val confidence = result.confidence ?: 0f
-                        db.captureRecordDao().updateRecognition(
-                            id, result.itemName, result.category, confidence
-                        )
-                        Toast.makeText(
-                            context,
-                            "识别结果：${result.itemName}（${result.category}）",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        lastCaptureId = null
-                        lastCapturedBitmap = null
-                        unlockFreeze()
-                    } else {
-                        Toast.makeText(
-                            context,
-                            result.error ?: "识别失败，请重试",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
                 }
             }
         }
@@ -290,18 +248,6 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
             )
         }
 
-        // 定格画面层（点击可解锁）
-        if (frozenBitmap != null) {
-            Image(
-                bitmap = frozenBitmap!!.asImageBitmap(),
-                contentDescription = "定格画面（点击解锁）",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { unlockFreeze() },
-                contentScale = ContentScale.FillWidth
-            )
-        }
-
         // 预览区域遮罩（摄像头关闭时）
         if (!isCameraActive) {
             Box(
@@ -323,7 +269,7 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
         }
 
         // 全屏透明层（摄像头开启时可点击关闭）
-        if (isCameraActive && frozenBitmap == null) {
+        if (isCameraActive) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -346,71 +292,217 @@ fun WasteSortingScreen(onNavigateToRecords: () -> Unit = {}) {
             tint = if (isCameraActive) Color.White else Color.White.copy(alpha = 0.85f)
         )
 
-        // 右上角：设置按钮
-        Box(
+        // 右上角：历史记录按钮
+        Icon(
+            imageVector = Icons.Default.MoreVert,
+            contentDescription = "历史记录",
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 72.dp, end = 24.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "设置",
-                modifier = Modifier
-                    .size(32.dp)
-                    .clickable { showSettingsMenu = true },
-                tint = Color.White.copy(alpha = 0.85f)
-            )
-            DropdownMenu(
-                expanded = showSettingsMenu,
-                onDismissRequest = { showSettingsMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("浏览记录") },
-                    onClick = {
-                        showSettingsMenu = false
-                        onNavigateToRecords()
-                    }
-                )
-            }
-        }
+                .size(32.dp)
+                .clickable { onNavigateToRecords() },
+            tint = Color.White.copy(alpha = 0.85f)
+        )
 
-        // 底部按钮
-        Row(
+        // 底部居中：拍照按钮
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 36.dp, end = 36.dp, bottom = 48.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(bottom = 48.dp)
+                .size(72.dp)
+                .clip(CircleShape)
+                .border(4.dp, Color.White, CircleShape)
+                .background(Color.White.copy(alpha = 0.15f))
+                .clickable { takePhoto() },
+            contentAlignment = Alignment.Center
         ) {
-            Button(
-                onClick = recognize,
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isCameraActive)
-                        Color.Black.copy(alpha = 0.4f)
-                    else
-                        Color.White.copy(alpha = 0.2f)
-                )
-            ) {
-                Text("识别", fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Color.White)
-            }
-
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
-                    .border(4.dp, Color.White, CircleShape)
-                    .background(Color.White.copy(alpha = 0.15f))
-                    .clickable { takePhoto() },
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
+                    .background(Color.White)
+            )
+        }
+    }
+}
+
+// ============================================================
+// 识别结果页面
+// ============================================================
+@Composable
+fun ResultScreen(
+    bitmap: Bitmap,
+    recordId: Long,
+    onExit: () -> Unit
+) {
+    val context = LocalContext.current
+    val db = remember { GarbageDatabase.getInstance(context) }
+    val classifier = remember { GarbageClassifier.getInstance(context) }
+
+    var result by remember { mutableStateOf<GarbageClassifier.PredictionResult?>(null) }
+    var isRecognizing by remember { mutableStateOf(true) }
+
+    // 进入页面自动开始识别
+    LaunchedEffect(recordId) {
+        val r = withContext(Dispatchers.IO) {
+            classifier.classify(bitmap)
+        }
+        db.captureRecordDao().updateRecognition(recordId, r.label, r.category, r.confidence)
+        result = r
+        isRecognizing = false
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1B5E20),
+                        Color(0xFF0D3010),
+                        Color(0xFF000000)
+                    )
                 )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 16.dp)
+        ) {
+            // 顶部退出按钮
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "退出",
+                modifier = Modifier
+                    .padding(top = 48.dp, start = 16.dp)
+                    .size(32.dp)
+                    .clickable { onExit() },
+                tint = Color.White.copy(alpha = 0.85f)
+            )
+
+            Text(
+                text = "识别结果",
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 12.dp),
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 拍照图片
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "拍照图片",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.4f)
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.FillWidth
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 识别结果区域
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.1f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "识别结果",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (isRecognizing) {
+                        Text(
+                            text = "正在识别…",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 16.sp
+                        )
+                    } else {
+                        val r = result
+                        if (r != null && r.classId >= 0) {
+                            Text(
+                                text = r.label,
+                                color = Color.White,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(categoryColor(r.category))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = r.category,
+                                        color = Color.White,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.padding(start = 12.dp))
+                                Text(
+                                    text = "置信度 ${"%.1f".format(r.confidence * 100)}%",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "识别失败",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // AI建议占位区域
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.05f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "AI 建议",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "智能投放建议将在此展示",
+                        color = Color.White.copy(alpha = 0.25f),
+                        fontSize = 13.sp
+                    )
+                }
             }
         }
     }
@@ -569,14 +661,13 @@ fun CameraPreviewView(
 }
 
 // ============================================================
-// 静默保存 Bitmap 到 MediaStore 并写入数据库
+// 静默保存 Bitmap 到 MediaStore 并写入数据库，返回 recordId
 // ============================================================
-private suspend fun saveAndRecord(
+private suspend fun saveAndGetRecordId(
     context: android.content.Context,
     db: GarbageDatabase,
-    bitmap: Bitmap,
-    onSaved: (Long) -> Unit
-) = withContext(Dispatchers.IO) {
+    bitmap: Bitmap
+): Long = withContext(Dispatchers.IO) {
     try {
         val name = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.getDefault())
             .format(System.currentTimeMillis())
@@ -613,9 +704,23 @@ private suspend fun saveAndRecord(
             timestamp = System.currentTimeMillis()
         )
         val recordId = db.captureRecordDao().insert(record)
-        withContext(Dispatchers.Main) { onSaved(recordId) }
         Log.d(TAG, "拍照已保存: $uriStr, recordId=$recordId")
+        recordId
     } catch (e: Exception) {
         Log.e(TAG, "保存照片失败: ${e.message}", e)
+        -1L
+    }
+}
+
+// ============================================================
+// 垃圾分类颜色映射
+// ============================================================
+private fun categoryColor(category: String): Color {
+    return when (category) {
+        "可回收物" -> Color(0xFF2196F3)
+        "厨余垃圾" -> Color(0xFF4CAF50)
+        "有害垃圾" -> Color(0xFFF44336)
+        "其他垃圾" -> Color(0xFF9E9E9E)
+        else -> Color.Gray
     }
 }

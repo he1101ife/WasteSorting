@@ -40,6 +40,9 @@ android {
     buildFeatures {
         compose = true
     }
+    aaptOptions {
+        noCompress("tflite")
+    }
 }
 
 dependencies {
@@ -60,6 +63,7 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.okhttp)
+    implementation(libs.tflite)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
