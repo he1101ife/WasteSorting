@@ -69,6 +69,9 @@ interface CaptureRecordDao {
     @Query("DELETE FROM capture_records WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM capture_records WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("SELECT categoryName, COUNT(*) as cnt FROM capture_records WHERE isRecognized = 1 GROUP BY categoryName")
     suspend fun getCategoryStats(): List<CategoryStat>
 
